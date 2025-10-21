@@ -14,18 +14,18 @@ def parse_info_string(info: str) -> Dict[str, Any]:
     Parse the info string of a fenced code block.
 
     Example inputs:
-        "python mdexec id=foo a=1"
+        "python exec id=foo a=1"
         "bash mdexec output-id='bar' path=\"/tmp/test.sh\""
 
     Returns:
         {
             "lang": "python",
-            "is_mdexec": True,
+            "exec": True,
             "vars": {"id": "foo", "a": "1"}
         }
     """
     if not info:
-        return {'lang': '', 'is_mdexec': False, 'vars': {}}
+        return {'lang': '', 'exec': False, 'vars': {}}
 
     # shlex handles quotes and splitting like a shell command
     try:
@@ -34,25 +34,25 @@ def parse_info_string(info: str) -> Dict[str, Any]:
         parts = info.split()
 
     if not parts:
-        return {'lang': '', 'is_mdexec': False, 'vars': {}}
+        return {'lang': '', 'exec': False, 'vars': {}}
 
     lang = parts[0]
     vars_dict: Dict[str, str] = {}
-    is_mdexec = False
+    exec_ = False
 
     # process remaining tokens
     for part in parts[1:]:
-        if part == 'mdexec':
-            is_mdexec = True
+        if part == 'exec':
+            exec_ = True
             continue
         if '=' in part:
             key, value = part.split('=', 1)
             vars_dict[key] = value.strip('"\'')
         else:
-            # allow flags like "mdexec output" (rare)
+            # allow flags like "exec output" (rare)
             vars_dict[part] = ''
 
-    return {'lang': lang, 'is_mdexec': is_mdexec, 'vars': vars_dict}
+    return {'lang': lang, 'exec': exec_, 'vars': vars_dict}
 
 
 def extract_mdexec_blocks(text: str) -> List[CodeBlock]:
@@ -74,24 +74,33 @@ def extract_mdexec_blocks(text: str) -> List[CodeBlock]:
             continue
 
         info_data = parse_info_string(token.info or '')
+        executable = info_data.get('exec', False)
         lang = info_data['lang']
         vars_dict = info_data['vars']
+        # normalize - to _
+        vars_dict_snake = {k.replace('-', '_'): v for k, v in vars_dict.items()}
+        own_id = vars_dict_snake.get('id', None)
+        output_id = vars_dict_snake.get(
+            'output_id', None
+        )  # output this code block to another location
 
         # Determine type
-        block_type = 'output' if 'output-id' in vars_dict else 'input'
-
-        if not info_data['is_mdexec']:
-            continue
-
-        block_id = vars_dict.get('id') or vars_dict.get('output-id')
+        if executable:
+            block_type = 'executable'
+        elif output_id:
+            block_type = 'input'
+        elif own_id:
+            block_type = 'output'
 
         block = CodeBlock(
             token=token,
             lang=lang,
             code=token.content.strip('\n'),
-            id=block_id,
+            id=own_id,
+            output_id=output_id,
             type=block_type,
             vars=vars_dict,
+            executable=executable,
         )
         blocks.append(block)
 
@@ -120,7 +129,7 @@ def replace_output_block(
         md_text += '\n'
     if not updated:
         raise ValueError(
-            f'[warning] Expected output block found with id {block_id}. E.g.  <!-- output-id:{block_id} --> or ```lang mdexec output-id={block_id}'
+            f'[error] Could not find tag or code block with id={block_id}.'
         )
 
     return md_text
@@ -133,9 +142,9 @@ def _replace_html_output_block(
     Replace or insert the rendered output for a given mdexec block ID.
 
     The function looks for:
-        <!-- output-id:{block_id} -->
+        <!-- id:{block_id} -->
         ... (existing content) ...
-        <!-- /output-id:{block_id} -->
+        <!-- /:{block_id} -->
 
     If the ending tag is not found, it will be inserted automatically.
 
@@ -159,9 +168,9 @@ def _replace_html_output_block(
     for token in tokens:
         if token.type in ('html_inline', 'html_block'):
             content = token.content.strip()
-            if content == f'<!-- output-id:{block_id} -->':
+            if content == f'<!-- id:{block_id} -->':
                 start_line = token.map[0]
-            elif content == f'<!-- /output-id:{block_id} -->':
+            elif content == f'<!-- /id:{block_id} -->':
                 end_line = token.map[0]
 
     lines = md_text.splitlines()
@@ -169,7 +178,7 @@ def _replace_html_output_block(
     if start_line is not None and end_line is None:
         # Insert missing end marker right after start line
         end_line = start_line + 1
-        lines.insert(end_line, f'<!-- /output-id:{block_id} -->')
+        lines.insert(end_line, f'<!-- /id:{block_id} -->')
 
     if start_line is not None and end_line is not None:
         # Compute indentation padding (optional but nice)

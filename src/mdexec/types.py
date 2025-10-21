@@ -12,8 +12,10 @@ class CodeBlock:
     lang: str
     code: str
     id: Optional[str]
-    type: str  # "input" or "output"
+    output_id: Optional[str]
+    type: str  # "input" or "output" or "executable"
     vars: Dict[str, str]
+    executable: bool = False
 
     @property
     def is_input(self) -> bool:

@@ -2,14 +2,14 @@
 
 A lightweight runnable Markdown notebook.
 
-## Example
+## Examples
 
-The code block below shows the command to view the `mdexec` command usage. The next code block automatically gets updated with the result each time the notebook is run.
+### Auto-updating "usage" text
 
-```bash mdexec id=help
+```bash exec output-id=help
 mdexec --help
 ```
-```output mdexec output-id=help
+```output id=help
 usage: mdexec [-h] [-o OUTPUT] input_file
 
 Execute code blocks in a Markdown file and render results inline.
@@ -23,3 +23,18 @@ options:
                         Optional path for the output Markdown file. If
                         omitted, outputs to the input file
 ```
+
+### Complex Markdown generation
+
+```python exec output-id=fruits-list
+fruits = ['apple', 'banana', 'cherry']
+for fruit in fruits:
+	print(f'- {fruit}') 
+```
+
+My favorite fruits are:
+<!-- id:fruits-list -->
+- apple
+- banana
+- cherry
+<!-- /id:fruits-list -->

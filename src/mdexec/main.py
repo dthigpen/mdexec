@@ -49,25 +49,38 @@ def run_mdexec(text: str) -> str:
 
     rendered_text = text
     for block in code_blocks:
-        if not block.is_input:
+        if not block.executable:
             continue
         try:
-            if block.id is None:
+            own_id = block.id
+            output_id = block.output_id
+            if output_id is None:
                 print(
-                    f'[warning] Expected code block lang string to contain id=foo. Output will only be printed to the console.'
+                    f'[warning] Executable code block did not contain an output-id. Output will be printed to the console.'
                 )
+            info_str = ''
+            if own_id:
+                info_str += f'id={own_id}'
+            if output_id:
+                info_str += f'output_id={output_id}'
+            if not info_str:
+                info_str = '<anonymous>'
+            print(f'[info] Running code block: {info_str}')
+
             result = execute_code_block(block)
         except Exception as e:
-            result = f'⚠️ Error: {e}'
+            result = f'Error: {e}'
 
-        if block.id is not None:
+        if output_id:
             # Replace or insert the output block in the markdown
             rendered_text = replace_output_block(
                 rendered_text,
-                block.id,
+                output_id,
                 result,
                 match_indent=False,
             )
+        else:
+            print(result)
 
     return rendered_text
 
