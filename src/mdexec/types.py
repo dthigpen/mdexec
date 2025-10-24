@@ -1,19 +1,29 @@
 from dataclasses import dataclass
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Literal
 
 from markdown_it.token import Token
 
 
 @dataclass
-class CodeBlock:
+class IoBlock:
+    content: str
+    id: Optional[str]
+    # type: Literal['input', 'output']
+
+
+@dataclass
+class HtmlBlock(IoBlock):
+    start_token: Token
+    end_token: Token
+
+
+@dataclass
+class CodeBlock(IoBlock):
     """Represents a fenced code block processed by mdexec."""
 
     token: Token
     lang: str
-    code: str
-    id: Optional[str]
     output_id: Optional[str]
-    type: str  # "input" or "output" or "executable"
     vars: Dict[str, str]
     executable: bool = False
 

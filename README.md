@@ -27,14 +27,31 @@ options:
 ### Complex Markdown generation
 
 ```python exec output-id=fruits-list
-fruits = ['apple', 'banana', 'cherry']
-for fruit in fruits:
-	print(f'- {fruit}') 
+fruits = ['Apple', 'Banana', 'Cherry']
+for i, fruit in enumerate(fruits):
+	print(f'{i+1}. {fruit}') 
 ```
 
 My favorite fruits are:
 <!-- id:fruits-list -->
-- apple
-- banana
-- cherry
+1. Apple
+2. Banana
+3. Cherry
 <!-- /id:fruits-list -->
+
+
+```csv id=mycsv
+aaa,bb,cc
+111,22,33
+xxx,yy,zz
+```
+
+```python exec output-id=test
+
+b = list(query_blocks(id='mycsv'))[0]
+print(b.content)
+```
+
+```output id=test
+❌ Python error: query_blocks() missing 1 required positional argument: 'md_text'
+```

@@ -5,6 +5,7 @@ import io
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Any, Dict
 from .types import CodeBlock
+from mdexec.markdown_io import query_blocks
 
 
 def execute_code_block(block: CodeBlock) -> str:
@@ -23,11 +24,13 @@ def execute_code_block(block: CodeBlock) -> str:
     """
     lang = block.lang.lower()
 
+    if not block.executable:
+        raise ValueError(f'Block is not executable')
     if lang in ('python', 'py'):
-        return _exec_python(block.code)
+        return _exec_python(block.content)
 
     elif lang in ('bash', 'sh'):
-        return _exec_subprocess(block.code, shell=True)
+        return _exec_subprocess(block.content, shell=True)
 
     else:
         return f"⚠️ Unsupported language '{lang}' — skipping execution."
@@ -40,7 +43,10 @@ def _exec_python(code: str) -> str:
 
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            exec(code, {})
+            exec(
+                code,
+                {'STARTING_CONTENT': 'TODO insert here', 'query_blocks': query_blocks},
+            )
     except Exception as e:
         print(f'❌ Python error: {e}', file=stderr)
 

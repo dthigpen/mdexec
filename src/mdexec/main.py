@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any
 from markdown_it import MarkdownIt
 from .executor import execute_code_block
-from .markdown_io import replace_output_block, extract_mdexec_blocks
+from .types import CodeBlock
+from .markdown_io import replace_output_block, extract_blocks
 
 
 def main():
@@ -29,7 +30,15 @@ def main():
     rendered_md = run_mdexec(input_md)
 
     output_path = args.output or args.input_file
-    output_path.write_text(rendered_md, encoding='utf-8')
+    # print('--------')
+    # print(input_md)
+    # print(id(rendered_md) == id(input_md), type(rendered_md))
+    # print(input_md.splitlines()[15])
+    # print(rendered_md.splitlines()[15])
+    if rendered_md != input_md:
+        output_path.write_text(rendered_md, encoding='utf-8')
+    else:
+        print('[info] No changes to save')
 
 
 def run_mdexec(text: str) -> str:
@@ -44,19 +53,16 @@ def run_mdexec(text: str) -> str:
         The rendered Markdown with code outputs inserted.
     """
 
-    # Extract all mdexec blocks (code blocks with mdexec directives)
-    code_blocks = extract_mdexec_blocks(text)
-
     rendered_text = text
-    for block in code_blocks:
-        if not block.executable:
+    for block in extract_blocks(text):
+        if not isinstance(block, CodeBlock) or not block.executable:
             continue
         try:
             own_id = block.id
             output_id = block.output_id
             if output_id is None:
                 print(
-                    f'[warning] Executable code block did not contain an output-id. Output will be printed to the console.'
+                    f'[warning] Executable code block did not contain an output-id. Running silently.'
                 )
             info_str = ''
             if own_id:
@@ -72,6 +78,7 @@ def run_mdexec(text: str) -> str:
             result = f'Error: {e}'
 
         if output_id:
+            print(f'adding result to {output_id}')
             # Replace or insert the output block in the markdown
             rendered_text = replace_output_block(
                 rendered_text,
@@ -81,7 +88,6 @@ def run_mdexec(text: str) -> str:
             )
         else:
             print(result)
-
     return rendered_text
 
 

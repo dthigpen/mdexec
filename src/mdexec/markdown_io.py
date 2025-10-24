@@ -6,7 +6,22 @@ import copy
 import re
 import shlex
 
-from .types import CodeBlock
+from .types import CodeBlock, HtmlBlock
+
+
+def query_blocks(md_text: str, id=None, ids=None, tag=None):
+    ids_list = []
+    if id is not None:
+        ids_list.append(id)
+    if ids is not None:
+        ids_list.extend(ids)
+
+    for block in extract_blocks(md_text):
+        for i in ids_list:
+            if block.id == i:
+                yield block
+        if tag is not None and block.vars.get('tag', None) == tag:
+            yield block
 
 
 def parse_info_string(info: str) -> Dict[str, Any]:
@@ -35,7 +50,6 @@ def parse_info_string(info: str) -> Dict[str, Any]:
 
     if not parts:
         return {'lang': '', 'exec': False, 'vars': {}}
-
     lang = parts[0]
     vars_dict: Dict[str, str] = {}
     exec_ = False
@@ -55,179 +69,169 @@ def parse_info_string(info: str) -> Dict[str, Any]:
     return {'lang': lang, 'exec': exec_, 'vars': vars_dict}
 
 
-def extract_mdexec_blocks(text: str) -> List[CodeBlock]:
-    """
-    Extracts mdexec-related code blocks (input or output) from markdown tokens.
+def parse_fence(token: Token) -> CodeBlock:
+    if token.type != 'fence':
+        raise ValueError(f'Code blocks must have a fence token')
 
-    Args:
-        text: The markdown formatted text.
+    info_data = parse_info_string(token.info or '')
+    executable = info_data.get('exec', False)
+    lang = info_data['lang']
+    vars_dict = info_data['vars']
+    # normalize - to _
+    vars_dict_snake = {k.replace('-', '_'): v for k, v in vars_dict.items()}
+    own_id = vars_dict_snake.get('id', None)
+    output_id = vars_dict_snake.get(
+        'output_id', None
+    )  # output this code block to another location
 
-    Returns:
-        A list of CodeBlock instances.
-    """
-    md = MarkdownIt()
-    tokens: List[Token] = md.parse(text)
+    # Determine type
+    if executable:
+        block_type = None
+    elif output_id:
+        block_type = 'input'
+    elif own_id:
+        block_type = 'output'
 
-    blocks: List[CodeBlock] = []
-    for token in tokens:
-        if token.type != 'fence':
-            continue
-
-        info_data = parse_info_string(token.info or '')
-        executable = info_data.get('exec', False)
-        lang = info_data['lang']
-        vars_dict = info_data['vars']
-        # normalize - to _
-        vars_dict_snake = {k.replace('-', '_'): v for k, v in vars_dict.items()}
-        own_id = vars_dict_snake.get('id', None)
-        output_id = vars_dict_snake.get(
-            'output_id', None
-        )  # output this code block to another location
-
-        # Determine type
-        if executable:
-            block_type = 'executable'
-        elif output_id:
-            block_type = 'input'
-        elif own_id:
-            block_type = 'output'
-
-        block = CodeBlock(
-            token=token,
-            lang=lang,
-            code=token.content.strip('\n'),
-            id=own_id,
-            output_id=output_id,
-            type=block_type,
-            vars=vars_dict,
-            executable=executable,
-        )
-        blocks.append(block)
-
-    return blocks
+    block = CodeBlock(
+        token=token,
+        lang=lang,
+        content=token.content.strip('\n'),
+        id=own_id,
+        output_id=output_id,
+        # type=block_type,
+        vars=vars_dict,
+        executable=executable,
+    )
+    return block
 
 
-def replace_output_block(
-    md_text: str, block_id: str, new_output: str, match_indent=True
-) -> str:
-    """Replace the output block (HTML or fenced code) with the given new_output."""
+def parse_html_comment_block(start_token: Token, end_token: Token, md_text: Token):
+    start_line = start_token.map[0] + 1
+    end_line = end_token.map[0] if end_token else start_line + 1
+    content = md_text[start_line:end_line] if end_token else ''
+    start_content = start_token.content.strip()
 
-    trailing_nl = md_text.endswith('\n')
-
-    # Try HTML blocks first
-    md_text, updated = _replace_html_output_block(
-        md_text, block_id, new_output, match_indent=match_indent
+    m = re.match(r'<!--\s+/?id:(\S+)(.*)\s+-->', start_content)
+    found_id = m.group(1)
+    rest = m.group(2).strip()
+    parsed = parse_info_string('lang ' + rest)
+    vars = parsed.get('vars', {})
+    if not found_id:
+        raise ValueError(f'HTML comment block must have an ID: {start_content}')
+    return HtmlBlock(
+        start_token=start_token,
+        end_token=end_token,
+        # type=None,
+        id=found_id,
+        content=content,
     )
 
-    # Then try fenced code blocks
-    if not updated:
-        md_text, updated = _replace_fenced_output_block(
-            md_text, block_id, new_output, match_indent=match_indent
-        )
 
-    if updated and trailing_nl:
-        md_text += '\n'
-    if not updated:
-        raise ValueError(
-            f'[error] Could not find tag or code block with id={block_id}.'
-        )
-
-    return md_text
-
-
-def _replace_html_output_block(
-    md_text: str, block_id: str, new_output: str, match_indent=True
-) -> Tuple[str, bool]:
-    """
-    Replace or insert the rendered output for a given mdexec block ID.
-
-    The function looks for:
-        <!-- id:{block_id} -->
-        ... (existing content) ...
-        <!-- /:{block_id} -->
-
-    If the ending tag is not found, it will be inserted automatically.
-
-    Args:
-        md_text: Original markdown text.
-        block_id: ID to locate in comment markers.
-        new_output: Replacement markdown (typically fenced output).
-
-    Returns:
-        (updated_text, updated_flag).
-    """
+def extract_blocks(md_text: str):
     md = MarkdownIt('commonmark')
     tokens = md.parse(md_text)
-    updated = False
+    html_id_start_tokens = {}
 
-    start_line = None
-    end_line = None
-
-    # TODO may need to switch to regex and pair matches if too many token edge cases
-    # Identify where this output section begins and ends
     for token in tokens:
         if token.type in ('html_inline', 'html_block'):
             content = token.content.strip()
-            if content == f'<!-- id:{block_id} -->':
-                start_line = token.map[0]
-            elif content == f'<!-- /id:{block_id} -->':
-                end_line = token.map[0]
-
-    lines = md_text.splitlines()
-
-    if start_line is not None and end_line is None:
-        # Insert missing end marker right after start line
-        end_line = start_line + 1
-        lines.insert(end_line, f'<!-- /id:{block_id} -->')
-
-    if start_line is not None and end_line is not None:
-        # Compute indentation padding (optional but nice)
-        indent = ''
-        if match_indent:
-            indent = _detect_indent(lines[start_line])
-            new_output = _indent_text(new_output, indent)
-
-        # Prepare replacement block content
-        rendered_lines = new_output.splitlines()
-
-        # Replace section in place
-        md_text = '\n'.join(lines[: start_line + 1] + rendered_lines + lines[end_line:])
-        updated = True
-    return (md_text, updated)
+            if m := re.match(r'<!--\s+id:(\S+)(.*)\s+-->', content):
+                found_id = m.group(1)
+                html_id_start_tokens[found_id] = token
+            elif m := re.match(r'<!--\s+/id:(\S+)\s+-->', content):
+                found_id = m.group(1)
+                start_token = html_id_start_tokens.pop(found_id, None)
+                if not start_token:
+                    raise ValueError(
+                        f'Found html block end token without the start token: {content}'
+                    )
+                yield parse_html_comment_block(start_token, token, md_text)
+        elif token.type == 'fence':
+            yield parse_fence(token)
+    # Handle unclosed html blocks?
+    for token_id, start_token in html_id_start_tokens.items():
+        yield parse_html_comment_block(start_token, None, md_text)
 
 
-def _replace_fenced_output_block(
-    md_text: str, block_id: str, new_output: str, match_indent=True
-) -> Tuple[str, bool]:
-    """
-    Replace output code blocks (```` ```output id=... ``` ````) matching the given block_id.
-    Returns (updated_text, updated_flag).
-    """
-    blocks = extract_mdexec_blocks(md_text)
+def replace_output_block(
+    md_text: str, block_id: str, new_content: str, match_indent=True
+) -> str:
+    """Replace the output block (HTML or fenced code) with the given new_output."""
+
+    blocks = extract_blocks(md_text)
     updated = False
     new_text = md_text
 
     for block in blocks:
-        if not block.is_output or block.id != block_id:
+        # reject if ids do not match or if its an executable codeblock
+        if block.id != block_id:
             continue
 
-        # get the line numbers from  the token
-        # TODO verify they are not "off by one" in this context
-        block_start, block_end, *_ = block.token.map
-        code_start = block_start + 1
-        code_end = block_end - 1
-        if match_indent:
-            indent = _detect_indent(block.code)
-            new_output = _indent_text(new_output, indent)
+        print(
+            f'Block "{block.id}" of type {type(block)} exec={isinstance(block, CodeBlock) and block.executable}'
+        )
+        # handle code block replacement
+        if isinstance(block, CodeBlock) and not block.executable:
+            new_text = _replace_fence_content(
+                block, new_text, new_content, match_indent=match_indent
+            )
+            updated = True
+            break  # only replace first match
+        elif isinstance(block, HtmlBlock):
+            new_text = _replace_html_block_content(
+                block, new_text, new_content, match_indent=match_indent
+            )
+            updated = True
+            break
+        return new_text, updated
 
-        lines = md_text.splitlines()
-        rendered_lines = new_output.splitlines()
-        # Replace section in place
-        new_text = '\n'.join(lines[:code_start] + rendered_lines + lines[code_end:])
-        updated = True
-        break  # only replace first match
+    if not updated:
+        raise ValueError(
+            f'[error] Could not find tag or code block with id={block_id}.'
+        )
+    return new_text
 
-    return new_text, updated
+
+def _replace_html_block_content(
+    block: HtmlBlock, md_text: str, new_output: str, match_indent=False
+) -> str:
+    lines = md_text.splitlines()
+    start_line = block.start_token.map[0]
+    end_line = block.end_token.map[0]
+
+    if not block.end_token:
+        lines.insert(end_line, f'<!-- /id:{block.id} -->')
+    # Compute indentation padding (optional but nice)
+    indent = ''
+    if match_indent:
+        indent = _detect_indent(lines[start_line])
+        new_output = _indent_text(new_output, indent)
+
+    # Prepare replacement block content
+    rendered_lines = new_output.splitlines()
+
+    # Replace section in place
+    new_text = '\n'.join(lines[: start_line + 1] + rendered_lines + lines[end_line:])
+    return new_text
+
+
+def _replace_fence_content(
+    block: CodeBlock, md_text: str, new_content: str, match_indent=False
+) -> str:
+    # get the line numbers from the token
+    # TODO verify they are not "off by one" in this context
+    block_start, block_end, *_ = block.token.map
+    code_start = block_start + 1
+    code_end = block_end - 1
+    if match_indent:
+        indent = _detect_indent(block.content)
+        new_output = _indent_text(new_output, indent)
+
+    lines = md_text.splitlines()
+    rendered_lines = new_content.splitlines()
+    # Replace section in place
+    new_text = '\n'.join(lines[:code_start] + rendered_lines + lines[code_end:])
+    return new_text
 
 
 def _detect_indent(text: str) -> str:
