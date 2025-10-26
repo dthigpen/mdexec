@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import Any
 from markdown_it import MarkdownIt
 from .executor import execute_code_block
-from .markdown_io import replace_output_block, extract_mdexec_blocks
+from .types import CodeBlock
+from .markdown_io import (
+    parse_blocks,
+    render_blocks,
+)
 
 
 def main():
@@ -24,12 +28,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Call our core processor (we’ll implement this next)
     input_md = args.input_file.read_text(encoding='utf-8')
     rendered_md = run_mdexec(input_md)
 
     output_path = args.output or args.input_file
-    output_path.write_text(rendered_md, encoding='utf-8')
+    if rendered_md != input_md:
+        output_path.write_text(rendered_md, encoding='utf-8')
+    else:
+        print('[info] No changes to save')
 
 
 def run_mdexec(text: str) -> str:
@@ -43,20 +49,16 @@ def run_mdexec(text: str) -> str:
     Returns:
         The rendered Markdown with code outputs inserted.
     """
-
-    # Extract all mdexec blocks (code blocks with mdexec directives)
-    code_blocks = extract_mdexec_blocks(text)
-
-    rendered_text = text
-    for block in code_blocks:
-        if not block.executable:
+    blocks = parse_blocks(text)
+    for block in blocks:
+        if not isinstance(block, CodeBlock) or not block.executable:
             continue
         try:
             own_id = block.id
             output_id = block.output_id
             if output_id is None:
                 print(
-                    f'[warning] Executable code block did not contain an output-id. Output will be printed to the console.'
+                    f'[warn] Executable code block did not contain an output-id. Outputing result to console.'
                 )
             info_str = ''
             if own_id:
@@ -65,24 +67,31 @@ def run_mdexec(text: str) -> str:
                 info_str += f'output_id={output_id}'
             if not info_str:
                 info_str = '<anonymous>'
-            print(f'[info] Running code block: {info_str}')
+            print(
+                f'[info] Running code block on line {block.token.map[0] + 1}: {block.pre_content.strip()}'
+            )
 
             result = execute_code_block(block)
         except Exception as e:
             result = f'Error: {e}'
-
         if output_id:
-            # Replace or insert the output block in the markdown
-            rendered_text = replace_output_block(
-                rendered_text,
-                output_id,
-                result,
-                match_indent=False,
+            output_block = next(
+                (
+                    b
+                    for b in blocks
+                    if b.id is not None
+                    and b.id.replace('-', '_') == output_id.replace('-', '_')
+                ),
+                None,
             )
+            if not output_block:
+                raise ValueError(
+                    f'Code block specified id of output block that does not exist: {output_id}'
+                )
+            output_block.content = result
         else:
             print(result)
-
-    return rendered_text
+    return render_blocks(blocks)
 
 
 if __name__ == '__main__':
