@@ -5,9 +5,10 @@ import io
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Any, Dict
 from .types import CodeBlock
+from .markdown_io import DocumentContext
 
 
-def execute_code_block(block: CodeBlock) -> str:
+def execute_code_block(block: CodeBlock, doc_context: DocumentContext = None) -> str:
     """
     Execute a single mdexec code block and return its captured output.
 
@@ -26,28 +27,34 @@ def execute_code_block(block: CodeBlock) -> str:
     if not block.executable:
         raise ValueError(f'Block is not executable')
     if lang in ('python', 'py'):
-        return _exec_python(block.content)
+        return _exec_python(
+            block.content,
+            env={
+                'get_blocks': doc_context.get_blocks,
+                'get_block': doc_context.get_block,
+            },
+        )
 
     elif lang in ('bash', 'sh'):
         return _exec_subprocess(block.content, shell=True)
 
     else:
-        return f"⚠️ Unsupported language '{lang}' — skipping execution."
+        return f"Unsupported language '{lang}' — skipping execution."
 
 
-def _exec_python(code: str) -> str:
+def _exec_python(code: str, env: dict = None) -> str:
     """Execute Python code and return captured stdout/stderr."""
     stdout = io.StringIO()
     stderr = io.StringIO()
-
+    env = env or {}
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             exec(
                 code,
-                {},
+                env,
             )
     except Exception as e:
-        print(f'❌ Python error: {e}', file=stderr)
+        print(f'Python error: {e}', file=stderr)
 
     out = stdout.getvalue()
     err = stderr.getvalue()
@@ -65,6 +72,6 @@ def _exec_subprocess(code: str, shell: bool = True) -> str:
         )
         output = result.stdout + result.stderr
     except Exception as e:
-        output = f'❌ Subprocess error: {e}'
+        output = f'Subprocess error: {e}'
 
     return output.strip()

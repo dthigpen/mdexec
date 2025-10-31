@@ -38,3 +38,26 @@ My favorite fruits are:
 2. Banana
 3. Cherry
 <!-- /id:fruits-list -->
+
+### Read, Transform, and Output to Markdown
+```python exec
+import json
+b = get_block(id='foobar')
+out = get_block(id='foobar2')
+out.content = json.dumps(json.loads(b.content), indent=2)
+```
+
+Unformatted input:
+ 
+```json id=foobar
+{"foo": "bar","example": true}
+```
+
+Formatted output:
+
+```jsonc id=foobar2
+{
+  "foo": "bar",
+  "example": true
+}
+```

@@ -9,6 +9,53 @@ import shlex
 from .types import CodeBlock, HtmlCommentBlock, TextBlock, Block
 
 
+class DocumentContext:
+    def __init__(self, markdown_text: str):
+        self.text = markdown_text
+        self.blocks = parse_blocks(markdown_text)
+
+    def get_blocks(self, id=None, ids=None, tag=None) -> list[Block]:
+        ids_list = []
+        if id is not None:
+            ids_list.append(id)
+        if ids is not None:
+            ids_list.append(ids)
+        ids_list = [i.replace('-', '_') for i in ids_list]
+        matching_blocks = []
+        for b in self.blocks:
+            has_matching_id = b.id is not None and b.id.replace('-', '_') in ids_list
+            has_matching_tag = tag is not None and b.vars.get('tag', None) == tag
+            if has_matching_id or has_matching_tag:
+                # if the block is a codeblock return a copy so that it cannot be edited, otherwise return the actual instance
+                if isinstance(b, CodeBlock) and b.executable:
+                    b = copy.deepcopy(b)
+                matching_blocks.append(b)
+        return matching_blocks
+
+    def get_block(self, id=None, tag=None) -> Block:
+        blocks = self.get_blocks(id=id, tag=tag)
+        return blocks[0] if blocks else None
+
+    def update_block(block: Block):
+        real_block = self.get_block(id=block.id)
+        real_block.content = block.content
+
+    def set_content(block: str | Block, content: str) -> Block:
+        block_id = None
+        if isinstance(block, Block):
+            block_id = block.id
+        else:
+            block_id = str(block)
+        real_block = self.get_block(id=block_id)
+        if real_block:
+            real_block.content = content
+            return copy.deepcopy(real_block)
+        else:
+            raise ValueError(
+                f'No block with id {block_id} exists to set the content of'
+            )
+
+
 def parse_info_string(info: str) -> Dict[str, Any]:
     """
     Parse the info string of a fenced code block.
@@ -192,11 +239,11 @@ def parse_blocks(md_text: str) -> list[Block]:
     if text_buffer_start_line != len(md_lines):
         append_and_reset_text_buffer(len(md_lines))
 
-    print(f'Parsed {len(blocks)} blocks')
-    for i, b in enumerate(blocks):
-        print(
-            f'{i + 1} {type(b).__name__} id={b.id}\n  pre={b.pre_content}\n  content={b.content}\n  post={b.post_content}'
-        )
+    # print(f'Parsed {len(blocks)} blocks')
+    # for i, b in enumerate(blocks):
+    #     print(
+    #         f'{i + 1} {type(b).__name__} id={b.id}\n  pre={b.pre_content}\n  content={b.content}\n  post={b.post_content}'
+    #     )
     return blocks
 
 
