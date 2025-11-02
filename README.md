@@ -61,3 +61,20 @@ Formatted output:
   "example": true
 }
 ```
+
+### Autoformatting Tables
+
+Reformat markdown tables so that the cells line up in the source text for easier plain-text editing and viewing.
+
+```python exec
+import mdexec
+out = get_block(id='table')
+out.content= mdexec.auto_format_markdown_table(out.content)
+```
+<!-- id:table -->
+| Fruit  |  Color  |
+| :--- | :--- |
+| Lemon  |  Yellow |
+| Apple  |  Red    |
+<!-- /id:table -->
+
