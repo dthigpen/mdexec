@@ -1,6 +1,49 @@
 # `mdexec`
 
-A lightweight runnable Markdown notebook.
+A lightweight runnable Markdown notebook. Easily execute Python and Bash code blocks within and output results anywhere in that Markdown file. Look at the examples in the source of [this README](https://github.com/dthigpen/mdexec/blob/main/README.md?plain=1)!
+
+## Installation
+
+Install directly from the git repository with:
+```
+pip install git+https://github.com/dthigpen/mdexec.git
+```
+
+## Usage
+
+Tag an area in your Markdown with where you want the output to be. For example:
+
+````markdown
+## My list of favorite things
+<!-- id:my-things -->
+<!-- /id:my-things -->
+````
+Alternatively, tag a code block for code output:
+
+````markdown
+```output id=my-things
+```
+````
+
+Then simply add `exec` and an `output-id` to your code block that you want to run:
+````markdown
+```python output-id=my-things
+for item in ['Food', 'Water', 'Plants']:
+  print(f'- {item}')
+```
+````
+
+Run the Markdown notebook with `mdexec notebook.md` to update in-place.
+
+The output section should now look like:
+````markdown
+## My list of favorite things
+<!-- id:my-things -->
+- Food
+- Water
+- Plants
+<!-- /id:my-things -->
+````
 
 ## Examples
 
@@ -78,3 +121,8 @@ out.content= mdexec.auto_format_markdown_table(out.content)
 | Apple  |  Red    |
 <!-- /id:table -->
 
+## To Do
+
+- Run any language in code blocks
+- Hidden code blocks for things like imports and boilerplate code
+- File watcher to rerun on save
