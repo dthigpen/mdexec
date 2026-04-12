@@ -1,14 +1,37 @@
 from __future__ import annotations
 import subprocess
-import sys
 import io
 from contextlib import redirect_stdout, redirect_stderr
-from typing import Any, Dict
-from .types import CodeBlock
-from .markdown_io import DocumentContext
+from .markdown import CodeBlock, Block
+import copy
 
 
-def execute_code_block(block: CodeBlock, doc_context: DocumentContext = None) -> str:
+class MdApi:
+    def __init__(self, blocks: list[Block]):
+        self._blocks = blocks
+        self._id_map = {b.id: b for b in blocks if b.id is not None}
+
+    def __getitem__(self, block_id: str):
+        return self.get(block_id)
+
+    def get(self, block_id: str) -> Block | None:
+        block = self._id_map.get(block_id)
+        return copy.deepcopy(block) if block else None
+
+    def set(self, block_id: str, content: str) -> None:
+        block = self._id_map.get(block_id)
+        if not block:
+            raise ValueError(f"No block with id '{block_id}'")
+        block.content = content
+
+    def find(self, predicate=None) -> list[Block]:
+        results = self._blocks
+        if predicate:
+            results = [b for b in results if predicate(b)]
+        return [copy.deepcopy(b) for b in results]
+
+
+def execute_code_block(block: CodeBlock, all_blocks: list[Block] = None) -> str:
     """
     Execute a single mdexec code block and return its captured output.
 
@@ -26,20 +49,20 @@ def execute_code_block(block: CodeBlock, doc_context: DocumentContext = None) ->
 
     if not block.executable:
         raise ValueError(f'Block is not executable')
-    if lang in ('python', 'py'):
+    if lang in ('python', 'py', 'python3'):
+        # TODO handle ctx so that vars can be shared across code blocks
+        env = {}
+        env['md'] = MdApi(all_blocks)
         return _exec_python(
             block.content,
-            env={
-                'get_blocks': doc_context.get_blocks,
-                'get_block': doc_context.get_block,
-            },
+            env=env,
         )
 
     elif lang in ('bash', 'sh'):
         return _exec_subprocess(block.content, shell=True)
 
     else:
-        return f"Unsupported language '{lang}' — skipping execution."
+        return f"Unsupported language '{lang}' - skipping execution."
 
 
 def _exec_python(code: str, env: dict = None) -> str:
@@ -51,13 +74,14 @@ def _exec_python(code: str, env: dict = None) -> str:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             exec(
                 code,
-                env,
+                env,  # By only providing the globals env, locals will also go into here
             )
     except Exception as e:
         print(f'Python error: {e}', file=stderr)
 
     out = stdout.getvalue()
     err = stderr.getvalue()
+
     return (out + err).strip()
 
 

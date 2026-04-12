@@ -2,15 +2,8 @@
 
 import argparse
 from pathlib import Path
-from typing import Any
-from markdown_it import MarkdownIt
 from .executor import execute_code_block
-from .types import CodeBlock
-from .markdown_io import (
-    parse_blocks,
-    render_blocks,
-    DocumentContext,
-)
+from .markdown import parse_document, apply_updates, HtmlCommentBlock, CodeBlock
 
 
 def main():
@@ -38,53 +31,55 @@ def main():
         print('[info] No changes to save')
 
 
+def get_line_number(text: str, idx: int) -> int:
+    return text.count('\n', 0, idx) + 1
+
+
 def run_mdexec(text: str) -> str:
     """
-    Process a Markdown file, execute code blocks marked with 'mdexec',
-    and inject or update output blocks in the Markdown.
-
-    Args:
-        path: Path to the input Markdown file.
-
-    Returns:
-        The rendered Markdown with code outputs inserted.
+    Parse, execute, and update a Markdown document.
     """
-    doc = DocumentContext(text + '')
-    blocks = doc.blocks
-    for block in blocks:
-        if not isinstance(block, CodeBlock) or not block.executable:
-            continue
-        try:
-            own_id = block.id
-            output_id = block.output_id
-            if output_id is None:
-                print(
-                    f'[warn] Executable code block did not contain an output-id. Outputing result to console.'
-                )
-            info_str = ''
-            if own_id:
-                info_str += f'id={own_id}'
-            if output_id:
-                info_str += f'output_id={output_id}'
-            if not info_str:
-                info_str = '<anonymous>'
-            print(
-                f'[info] Running code block on line {block.token.map[0] + 1}: {block.pre_content.strip()}'
-            )
 
-            result = execute_code_block(block, doc)
+    blocks = parse_document(text)
+
+    for block in blocks:
+        if not isinstance(block, CodeBlock):
+            continue
+
+        if not block.executable:
+            continue
+
+        try:
+            output_id = block.get_option('output-id', None)
+
+            info = []
+            if block.id:
+                info.append(f'id={block.id}')
+            if output_id:
+                info.append(f'output_id={output_id}')
+
+            info_str = ' '.join(info) if info else '<anonymous>'
+            line = get_line_number(text, block.start_idx)
+            print(f'[info] Running code block on line {line}: {info_str}')
+
+            # --- Execute ---
+            result = execute_code_block(block, all_blocks=blocks)
+
         except Exception as e:
             result = f'Error: {e}'
+
+        # --- Route output ---
         if output_id:
-            output_block = doc.get_block(id=output_id)
+            output_block = next((b for b in blocks if b.id == output_id), None)
+
             if not output_block:
-                raise ValueError(
-                    f'Code block specified id of output block that does not exist: {output_id}'
-                )
+                raise ValueError(f'Missing output block with id: {output_id}')
+
             output_block.content = result
         else:
             print(result)
-    return render_blocks(blocks)
+
+    return apply_updates(text, blocks)
 
 
 if __name__ == '__main__':

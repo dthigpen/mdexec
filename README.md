@@ -1,6 +1,17 @@
 # `mdexec`
 
-A lightweight runnable Markdown notebook. Easily execute Python and Bash code blocks within and output results anywhere in that Markdown file. Look at the examples in the source of [this README](https://github.com/dthigpen/mdexec/blob/main/README.md?plain=1)!
+A zero-dependency, lightweight, runnable Markdown notebook. Easily execute Python and Bash code blocks and output results anywhere in the same file. Look at the examples in the source of [this README](https://github.com/dthigpen/mdexec/blob/main/README.md?plain=1) or the [examples](https://github.com/dthigpen/mdexec/blob/main/examples/) directory!
+
+````markdown
+## Example Docs
+The current time is: <!-- id:last-updated --><!-- /id:last-updated -->
+
+```python exec output-id=last-updated
+from datetime import datetime
+now = datetime.now()
+print(f"{now:%B %d, %Y at %I:%M %p}")
+```
+````
 
 ## Installation
 
@@ -11,38 +22,39 @@ pip install git+https://github.com/dthigpen/mdexec.git
 
 ## Usage
 
-Tag an area in your Markdown with where you want the output to be. For example:
+1. Create a Markdown file with code blocks for the code you want to run, and optionally tag other elements for input/output.
+2. Execute it with `mdexec notebook.md`
+
+Example Markdown file:
 
 ````markdown
-## My list of favorite things
-<!-- id:my-things -->
-<!-- /id:my-things -->
-````
-Alternatively, tag a code block for code output:
+## Example Docs
+Last Updated: <!-- id:last-updated -->DATE WILL BE OVERWRITTEN HERE<!-- /id:last-updated -->
 
-````markdown
-```output id=my-things
+### Example API Call In Docs
+
+The following block will be populated after running `mdexec`. Notice that this output block can be anywhere in the document, not just right after the Python block.
+
+```json id=response
 ```
-````
 
-Then simply add `exec` and an `output-id` to your code block that you want to run:
-````markdown
-```python output-id=my-things
-for item in ['Food', 'Water', 'Plants']:
-  print(f'- {item}')
+This code will perform the fetch and output the result above. Notice the `exec` attribute to mark it executable by `mdexec`, and the `output-id` to indicate where to send the stdout/stderr output.
+
+```python exec output-id=response
+import requests
+import json
+response = requests.get("https://jsonplaceholder.typicode.com/todos/1")
+print(json.dumps(response.json(), indent=4))
 ```
-````
 
-Run the Markdown notebook with `mdexec notebook.md` to update in-place.
+Alternatively, instead of using `output-id` and stdout/stderr you can use the Python API:
 
-The output section should now look like:
-````markdown
-## My list of favorite things
-<!-- id:my-things -->
-- Food
-- Water
-- Plants
-<!-- /id:my-things -->
+```python exec
+from datetime import datetime
+now = datetime.now()
+# Set the content of the block with id=last-updated
+md.set('last-updated', f"{now:%B %d, %Y at %I:%M %p}")
+```
 ````
 
 ## Examples
@@ -111,7 +123,7 @@ Reformat markdown tables so that the cells line up in the source text for easier
 
 ```python exec
 import mdexec
-out = get_block(id='table')
+out = md.get('table')
 out.content= mdexec.auto_format_markdown_table(out.content)
 ```
 <!-- id:table -->
