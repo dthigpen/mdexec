@@ -135,6 +135,7 @@ out.content= mdexec.auto_format_markdown_table(out.content)
 
 ## To Do
 
-- Run any language in code blocks
-- Hidden code blocks for things like imports and boilerplate code
-- File watcher to rerun on save
+- Shared Python contexts across multiple code blocks. Each code block is isolated right now.
+- File watcher to rerun on save. E.g. `mdexec --watch *.md`.
+- More Markdown tests to ensure things like indented code blocks get handled properly.
+- Better error handling and output for when Exceptions get raised during execution.
