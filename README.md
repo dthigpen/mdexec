@@ -4,8 +4,6 @@ A lightweight, zero-dependency way to turn Markdown into a **runnable notebook**
 
 Execute Python or Bash code blocks and write results **anywhere in the same file**, no hidden state, no UI, just plain text.
 
----
-
 ## Example
 
 The current time is: <!-- id:last-updated -->April 19, 2026 at 08:29 AM<!-- /id:last-updated -->
@@ -24,8 +22,6 @@ mdexec README.md
 
 and the timestamp updates in-place.
 
----
-
 ## How it works
 
 * Add `exec` to any code block you want executed
@@ -35,8 +31,6 @@ and the timestamp updates in-place.
 
 No hidden metadata. Just Markdown.
 
----
-
 ## Installation
 
 Install directly from GitHub:
@@ -44,8 +38,6 @@ Install directly from GitHub:
 ```
 pip install git+https://github.com/dthigpen/mdexec.git
 ```
-
----
 
 ## Usage
 
@@ -73,8 +65,6 @@ print(2 + 2)
 ```
 mdexec notebook.md
 ```
-
----
 
 ## More Examples
 
@@ -129,8 +119,6 @@ x = data['value'] * 456
 ```
 ````
 
----
-
 ### Shared Execution Context (Coming Soon)
 
 ````
@@ -144,8 +132,6 @@ print(y)
 ```
 ````
 
----
-
 ### Bash Support
 
 ````
@@ -153,8 +139,6 @@ print(y)
 echo "Hello from bash"
 ```
 ````
-
----
 
 ### Dynamic Tables
 
@@ -173,18 +157,14 @@ for k, v in prices.items():
 ```
 ````
 
----
-
 ## Features
 
 * Execute Python and Bash code blocks
 * Write output anywhere in the document
-* Shared execution context across blocks
+* Shared execution context across blocks (Coming soon)
 * Minimal, readable Markdown (no hidden formats)
 * Line-preserving updates (no full rewrites)
 * Zero dependencies
-
----
 
 ## Design Philosophy
 
@@ -192,8 +172,6 @@ for k, v in prices.items():
 * Execution should be **transparent and inspectable**
 * Outputs should be **stable and version-control friendly**
 * No hidden state, no magic files
-
----
 
 ## To Do
 

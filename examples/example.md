@@ -1,5 +1,5 @@
 ## Example Docs
-Last Updated: <!-- id:last-updated -->April 19, 2026 at 08:48 AM<!-- /id:last-updated -->
+Last Updated: <!-- id:last-updated -->April 19, 2026 at 09:11 AM<!-- /id:last-updated -->
 
 Browse the rendered and raw Markdown of the sections below to get an idea of what `mdexec` is capable of.
 
@@ -14,6 +14,7 @@ The following block will be populated after running `mdexec`. Notice that this o
     "title": "delectus aut autem",
     "completed": false
 }
+
 
 
 
@@ -75,6 +76,7 @@ options:
 
 
 
+
 ```
 
 ### Complex Markdown generation
@@ -102,7 +104,6 @@ A global `md` API object for reading and updating markdown content.
 import json
 input_data = md.get('foobar')
 md.set('foobar2', json.dumps(json.loads(input_data.content), indent=2))
-raise ValueError('asdf')
 ```
 
 Unformatted input:
