@@ -1,141 +1,202 @@
 # `mdexec`
 
-A zero-dependency, lightweight, runnable Markdown notebook. Easily execute Python and Bash code blocks and output results anywhere in the same file. Look at the examples in the source of [this README](https://github.com/dthigpen/mdexec/blob/main/README.md?plain=1) or the [examples](https://github.com/dthigpen/mdexec/blob/main/examples/) directory!
+A lightweight, zero-dependency way to turn Markdown into a **runnable notebook**.
 
-````markdown
-## Example Docs
-The current time is: <!-- id:last-updated --><!-- /id:last-updated -->
+Execute Python or Bash code blocks and write results **anywhere in the same file**, no hidden state, no UI, just plain text.
+
+---
+
+## Example
+
+The current time is: <!-- id:last-updated -->April 19, 2026 at 08:29 AM<!-- /id:last-updated -->
 
 ```python exec output-id=last-updated
 from datetime import datetime
 now = datetime.now()
 print(f"{now:%B %d, %Y at %I:%M %p}")
 ```
-````
+
+Run:
+
+```
+mdexec README.md
+```
+
+and the timestamp updates in-place.
+
+---
+
+## How it works
+
+* Add `exec` to any code block you want executed
+* Capture output with `output-id=...`
+* Reference locations in Markdown using `<!-- id:... --> ... <!-- /id:... -->` or `id=...` in another code block
+* `mdexec` rewrites only the parts that change
+
+No hidden metadata. Just Markdown.
+
+---
 
 ## Installation
 
-Install directly from the git repository with:
+Install directly from GitHub:
+
 ```
 pip install git+https://github.com/dthigpen/mdexec.git
 ```
 
+---
+
 ## Usage
 
-1. Create a Markdown file with code blocks for the code you want to run, and optionally tag other elements for input/output.
-2. Execute it with `mdexec notebook.md`
-
-Example Markdown file:
+1. Create a Markdown file
+2. Add executable code blocks:
 
 ````markdown
-## Example Docs
-Last Updated: <!-- id:last-updated -->DATE WILL BE OVERWRITTEN HERE<!-- /id:last-updated -->
-
-### Example API Call In Docs
-
-The following block will be populated after running `mdexec`. Notice that this output block can be anywhere in the document, not just right after the Python block.
-
-```json id=response
-```
-
-This code will perform the fetch and output the result above. Notice the `exec` attribute to mark it executable by `mdexec`, and the `output-id` to indicate where to send the stdout/stderr output.
-
-```python exec output-id=response
-import requests
-import json
-response = requests.get("https://jsonplaceholder.typicode.com/todos/1")
-print(json.dumps(response.json(), indent=4))
-```
-
-Alternatively, instead of using `output-id` and stdout/stderr you can use the Python API:
-
 ```python exec
-from datetime import datetime
-now = datetime.now()
-# Set the content of the block with id=last-updated
-md.set('last-updated', f"{now:%B %d, %Y at %I:%M %p}")
+x = 1 + 1
 ```
 ````
 
-## Examples
+3. (Optional) Capture output:
 
-### Auto-updating "usage" text
+````markdown
+<!-- id:result -->old<!-- /id:result -->
 
-```bash exec output-id=help
-mdexec --help
+```python exec output-id=result
+print(2 + 2)
 ```
-```output id=help
-usage: mdexec [-h] [-o OUTPUT] input_file
+````
 
-Execute code blocks in a Markdown file and render results inline.
+4. Run:
 
-positional arguments:
-  input_file            Path to the Markdown file to execute
-
-options:
-  -h, --help            show this help message and exit
-  -o OUTPUT, --output OUTPUT
-                        Optional path for the output Markdown file. If
-                        omitted, outputs to the input file
+```
+mdexec notebook.md
 ```
 
-### Complex Markdown generation
+---
 
-```python exec output-id=fruits-list
-fruits = ['Apple', 'Banana', 'Cherry']
-for i, fruit in enumerate(fruits):
-	print(f'{i+1}. {fruit}') 
+## More Examples
+
+For full examples, check out the source of [`example.md`](https://github.com/dthigpen/mdexec/tree/main/examples/example.md). Alternatively, see the snippets below for a quick overview.
+
+### Inline Output Anywhere
+
+````markdown
+The result is: <!-- id:sum -->42<!-- /id:sum -->
+
+```python exec output-id=sum
+print(40 + 2)
 ```
+````
 
-My favorite fruits are:
-<!-- id:fruits-list -->
-1. Apple
-2. Banana
-3. Cherry
-<!-- /id:fruits-list -->
+### Output to Code Blocks
 
-### Read, Transform, and Output to Markdown
-```python exec
+````markdown
+```python exec output-id=result
 import json
-b = get_block(id='foobar')
-out = get_block(id='foobar2')
-out.content = json.dumps(json.loads(b.content), indent=2)
+print(json.dumps({'foo': 'bar', 'hello': True}, indent=2))
 ```
 
-Unformatted input:
- 
-```json id=foobar
-{"foo": "bar","example": true}
-```
-
-Formatted output:
-
-```jsonc id=foobar2
+```json id=result
 {
   "foo": "bar",
-  "example": true
+  "hello": true
+}
+```
+````
+
+### Input From Markdown
+
+A global `md` API object is injected into Python code blocks to programmatically read/write to the Markdown document.
+
+````markdown
+
+Given some input data:
+```json id=data
+{
+  "value": 123,
+  "hello": true
 }
 ```
 
-### Autoformatting Tables
-
-Reformat markdown tables so that the cells line up in the source text for easier plain-text editing and viewing.
+Perform some calculation with it:
 
 ```python exec
-import mdexec
-out = md.get('table')
-out.content= mdexec.auto_format_markdown_table(out.content)
+import json
+data = json.loads(md.get('data').content)
+x = data['value'] * 456
 ```
-<!-- id:table -->
-| Fruit  |  Color  |
-| :--- | :--- |
-| Lemon  |  Yellow |
-| Apple  |  Red    |
-<!-- /id:table -->
+````
+
+---
+
+### Shared Execution Context (Coming Soon)
+
+````
+```python exec ctx=calc
+x = 10
+```
+
+```python exec ctx=calc
+y = x + 5
+print(y)
+```
+````
+
+---
+
+### Bash Support
+
+````
+```bash exec
+echo "Hello from bash"
+```
+````
+
+---
+
+### Dynamic Tables
+
+A global `md` API object is injected into Python code blocks to programmatically read/write to the Markdown document. This can be used to update multiple references.
+
+````
+| Item | Price |
+|------|-------|
+| A    | <!-- id:a -->0<!-- /id:a --> |
+| B    | <!-- id:b -->0<!-- /id:b --> |
+
+```python exec
+prices = {"a": 10, "b": 20}
+for k, v in prices.items():
+    md.set(k, v)
+```
+````
+
+---
+
+## Features
+
+* Execute Python and Bash code blocks
+* Write output anywhere in the document
+* Shared execution context across blocks
+* Minimal, readable Markdown (no hidden formats)
+* Line-preserving updates (no full rewrites)
+* Zero dependencies
+
+---
+
+## Design Philosophy
+
+* Markdown is the source of truth
+* Execution should be **transparent and inspectable**
+* Outputs should be **stable and version-control friendly**
+* No hidden state, no magic files
+
+---
 
 ## To Do
 
 - Shared Python contexts across multiple code blocks. Each code block is isolated right now.
 - File watcher to rerun on save. E.g. `mdexec --watch *.md`.
 - More Markdown tests to ensure things like indented code blocks get handled properly.
-- Better error handling and output for when Exceptions get raised during execution.

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import subprocess
 import io
 from contextlib import redirect_stdout, redirect_stderr
@@ -31,7 +32,9 @@ class MdApi:
         return [copy.deepcopy(b) for b in results]
 
 
-def execute_code_block(block: CodeBlock, all_blocks: list[Block] = None) -> str:
+def execute_code_block(
+    block: CodeBlock, all_blocks: list[Block] = None, line_start=0
+) -> tuple[str, str]:
     """
     Execute a single mdexec code block and return its captured output.
 
@@ -43,7 +46,7 @@ def execute_code_block(block: CodeBlock, all_blocks: list[Block] = None) -> str:
         block: The CodeBlock object containing code and metadata.
 
     Returns:
-        Captured stdout + stderr as a single string.
+        Tuple of Captured stdout, stderr
     """
     lang = block.language.lower()
 
@@ -53,19 +56,18 @@ def execute_code_block(block: CodeBlock, all_blocks: list[Block] = None) -> str:
         # TODO handle ctx so that vars can be shared across code blocks
         env = {}
         env['md'] = MdApi(all_blocks)
-        return _exec_python(
-            block.content,
-            env=env,
-        )
+        return _exec_python(block.content, env=env, line_start=line_start)
 
     elif lang in ('bash', 'sh'):
         return _exec_subprocess(block.content, shell=True)
 
     else:
-        return f"Unsupported language '{lang}' - skipping execution."
+        raise ValueError(
+            f"Unsupported language '{lang}'. Remove the 'exec' attribute to continue."
+        )
 
 
-def _exec_python(code: str, env: dict = None) -> str:
+def _exec_python(code: str, env: dict = None, line_start=0) -> tuple[str, str]:
     """Execute Python code and return captured stdout/stderr."""
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -77,16 +79,22 @@ def _exec_python(code: str, env: dict = None) -> str:
                 env,  # By only providing the globals env, locals will also go into here
             )
     except Exception as e:
-        print(f'Python error: {e}', file=stderr)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        line_number = exc_tb.tb_next.tb_lineno if exc_tb.tb_next else exc_tb.tb_lineno
+        print(
+            f'[error] Exception occurred while executing line: {line_number + line_start}'
+        )
+        raise e
 
     out = stdout.getvalue()
     err = stderr.getvalue()
-
-    return (out + err).strip()
+    return (out, err)
 
 
 def _exec_subprocess(code: str, shell: bool = True) -> str:
     """Execute shell code via subprocess and return its combined output."""
+    out = None
+    err = None
     try:
         result = subprocess.run(
             code,
@@ -94,8 +102,9 @@ def _exec_subprocess(code: str, shell: bool = True) -> str:
             capture_output=True,
             text=True,
         )
-        output = result.stdout + result.stderr
+        out = result.stdout
+        err = result.stderr
     except Exception as e:
-        output = f'Subprocess error: {e}'
+        err = str(e)
 
-    return output.strip()
+    return (out, err)

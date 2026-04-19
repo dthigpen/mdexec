@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
 from pathlib import Path
 from .executor import execute_code_block
-from .markdown import parse_document, apply_updates, HtmlCommentBlock, CodeBlock
+from .markdown import parse_document, apply_updates, CodeBlock
 
 
 def main():
@@ -60,13 +61,13 @@ def run_mdexec(text: str) -> str:
 
             info_str = ' '.join(info) if info else '<anonymous>'
             line = get_line_number(text, block.start_idx)
-            print(f'[info] Running code block on line {line}: {info_str}')
+            print(f'[info] Running code block on line {line + 1}: {info_str}')
 
             # --- Execute ---
-            result = execute_code_block(block, all_blocks=blocks)
+            out, err = execute_code_block(block, all_blocks=blocks, line_start=line)
 
         except Exception as e:
-            result = f'Error: {e}'
+            raise e
 
         # --- Route output ---
         if output_id:
@@ -75,9 +76,14 @@ def run_mdexec(text: str) -> str:
             if not output_block:
                 raise ValueError(f'Missing output block with id: {output_id}')
 
-            output_block.content = result
+            output_block.content = out
         else:
-            print(result)
+            formatted_out = '\n'.join([f'[info] stdout: {l}' for l in out.splitlines()])
+            formatted_err = '\n'.join([f'[info] stderr: {l}' for l in err.splitlines()])
+            if out:
+                print(formatted_out)
+            if err:
+                print(formatted_err)
 
     return apply_updates(text, blocks)
 
