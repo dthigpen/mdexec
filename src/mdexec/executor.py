@@ -33,7 +33,7 @@ class MdApi:
 
 
 def execute_code_block(
-    block: CodeBlock, all_blocks: list[Block] = None, line_start=0
+    block: CodeBlock, all_blocks: list[Block] = None, line_start=0, envs=None
 ) -> tuple[str, str]:
     """
     Execute a single mdexec code block and return its captured output.
@@ -49,12 +49,16 @@ def execute_code_block(
         Tuple of Captured stdout, stderr
     """
     lang = block.language.lower()
-
+    if envs is None:
+        envs = {}
     if not block.executable:
         raise ValueError(f'Block is not executable')
     if lang in ('python', 'py', 'python3'):
-        # TODO handle ctx so that vars can be shared across code blocks
         env = {}
+        # get shared env if applicable
+        ctx = block.get_option('ctx')
+        if ctx is not None:
+            env = envs.setdefault(ctx, {})
         env['md'] = MdApi(all_blocks)
         return _exec_python(block.content, env=env, line_start=line_start)
 

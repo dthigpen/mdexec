@@ -1,5 +1,5 @@
 ## Example Docs
-Last Updated: <!-- id:last-updated -->April 19, 2026 at 09:11 AM<!-- /id:last-updated -->
+Last Updated: <!-- id:last-updated -->April 19, 2026 at 09:17 AM<!-- /id:last-updated -->
 
 Browse the rendered and raw Markdown of the sections below to get an idea of what `mdexec` is capable of.
 
@@ -14,6 +14,7 @@ The following block will be populated after running `mdexec`. Notice that this o
     "title": "delectus aut autem",
     "completed": false
 }
+
 
 
 
@@ -46,6 +47,25 @@ now = datetime.now()
 md.set('last-updated', f"{now:%B %d, %Y at %I:%M %p}")
 ```
 
+
+### Shared Execution Context
+
+Start in one code block,
+
+```python exec ctx=calc
+def add10(num: int) -> int:
+    return num + 10
+```
+
+and continue in another:
+
+```python exec ctx=calc
+y = add10(5)
+print(y)
+```
+
+Both code blocks have the same `ctx` attribute value (i.e. `ctx=calc`), so they use the same Python environment.
+
 ### Auto-updating "usage" text
 
 A low effort README that stays up to date with the CLI:
@@ -66,6 +86,7 @@ options:
   -o OUTPUT, --output OUTPUT
                         Optional path for the output Markdown file. If
                         omitted, outputs to the input file
+
 
 
 

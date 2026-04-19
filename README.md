@@ -119,7 +119,7 @@ x = data['value'] * 456
 ```
 ````
 
-### Shared Execution Context (Coming Soon)
+### Shared Execution Context
 
 ````
 ```python exec ctx=calc
@@ -161,7 +161,7 @@ for k, v in prices.items():
 
 * Execute Python and Bash code blocks
 * Write output anywhere in the document
-* Shared execution context across blocks (Coming soon)
+* Shared or isolated execution context across blocks
 * Minimal, readable Markdown (no hidden formats)
 * Line-preserving updates (no full rewrites)
 * Zero dependencies
@@ -175,6 +175,5 @@ for k, v in prices.items():
 
 ## To Do
 
-- Shared Python contexts across multiple code blocks. Each code block is isolated right now.
 - File watcher to rerun on save. E.g. `mdexec --watch *.md`.
 - More Markdown tests to ensure things like indented code blocks get handled properly.

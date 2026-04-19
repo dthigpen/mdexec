@@ -42,7 +42,7 @@ def run_mdexec(text: str) -> str:
     """
 
     blocks = parse_document(text)
-
+    envs = {}
     for block in blocks:
         if not isinstance(block, CodeBlock):
             continue
@@ -64,7 +64,9 @@ def run_mdexec(text: str) -> str:
             print(f'[info] Running code block on line {line + 1}: {info_str}')
 
             # --- Execute ---
-            out, err = execute_code_block(block, all_blocks=blocks, line_start=line)
+            out, err = execute_code_block(
+                block, all_blocks=blocks, line_start=line, envs=envs
+            )
 
         except Exception as e:
             raise e
