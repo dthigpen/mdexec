@@ -1,5 +1,5 @@
 ## Example Docs
-Last Updated: <!-- id:last-updated -->April 19, 2026 at 09:17 AM<!-- /id:last-updated -->
+Last Updated: <!-- id:last-updated -->April 19, 2026 at 04:41 PM<!-- /id:last-updated -->
 
 Browse the rendered and raw Markdown of the sections below to get an idea of what `mdexec` is capable of.
 
@@ -14,18 +14,6 @@ The following block will be populated after running `mdexec`. Notice that this o
     "title": "delectus aut autem",
     "completed": false
 }
-
-
-
-
-
-
-
-
-
-
-
-
 ```
 
 This code will perform the fetch and output the result above. The `exec` attribute marks it executable by `mdexec`, and the `output-id` to indicate where to send the stdout/stderr output.
@@ -86,18 +74,6 @@ options:
   -o OUTPUT, --output OUTPUT
                         Optional path for the output Markdown file. If
                         omitted, outputs to the input file
-
-
-
-
-
-
-
-
-
-
-
-
 ```
 
 ### Complex Markdown generation
@@ -141,18 +117,3 @@ Formatted output:
   "example": true
 }
 ```
-
-### Autoformatting Tables
-
-Reformat markdown tables so that the cells line up in the source text for easier plain-text editing and viewing.
-
-```python exec
-import mdexec
-out = md.get('table')
-updated = mdexec.auto_format_markdown_table(out.content)
-md.set('table', updated)
-```
-<!-- id:table -->| Fruit  |  Color  |
-| :--- | :--- |
-| Lemon  |  Yellow |
-| Apple  |  Red    |<!-- /id:table -->

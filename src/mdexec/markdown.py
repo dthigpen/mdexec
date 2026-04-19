@@ -2,12 +2,15 @@ from __future__ import annotations
 import re
 
 FENCE_RE = re.compile(r'^(\s*)(`{3,})(.*)$', re.MULTILINE)
-COMMENT_OPEN_RE = re.compile(r'<!--\s*id:([a-zA-Z0-9\-_]+)(.*?)-->')
-COMMENT_CLOSE_RE = re.compile(r'<!--\s*/id:([a-zA-Z0-9\-_]+)\s*-->')
+COMMENT_OPEN_RE = re.compile(r'<!--\s*id:(\S+)(.*?)-->')
+COMMENT_CLOSE_RE = re.compile(r'<!--\s*/id:(\S+)\s*-->')
 
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
+
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional
 
 
 @dataclass
@@ -20,13 +23,17 @@ class Block:
     end_idx: int = -1
     options: Dict[str, str] = field(default_factory=dict)
 
+    def __post_init__(self):
+        self._original_content = self.content
+
+    # --- helpers ---
     @property
-    def full_content(self):
-        return str(self.pre_content) + str(self.content) + str(self.post_content)
+    def full_content(self) -> str:
+        return f'{self.pre_content}{self.content}{self.post_content}'
 
     @property
-    def id(self) -> str:
-        return self.options.get('id', None)
+    def id(self) -> Optional[str]:
+        return self.options.get('id')
 
     def get_option(self, key: str, default=None) -> Any:
         return {k.replace('-', '_'): v for k, v in self.options.items()}.get(
@@ -35,13 +42,30 @@ class Block:
 
 
 @dataclass
-class TextBlock(Block):
-    pass
-
-
-@dataclass
 class HtmlCommentBlock(Block):
-    pass
+    def _is_block_style(self) -> bool:
+        return self._original_content.startswith(
+            '\n'
+        ) or self._original_content.endswith('\n')
+
+    @property
+    def full_content(self):
+        pre = self.pre_content
+        con = self.content
+        post = self.post_content
+
+        if not con:
+            return pre + post
+
+        if self._is_block_style():
+            if not con.endswith('\n'):
+                con += '\n'
+            if not con.startswith('\n'):
+                con = '\n' + con
+            return pre + con + post.lstrip('\n')
+        else:
+            # Inline
+            return pre + con.strip('\n') + post
 
 
 @dataclass
@@ -55,13 +79,19 @@ class CodeBlock(Block):
         return bool(self.options.get('exec', False))
 
     @property
-    def full_content(self):
+    def full_content(self) -> str:
+        pre = self.pre_content
+        con = self.content
+        post = self.post_content.lstrip('\n\r')
 
-        pre = str(self.pre_content)
-        con = str(self.content)
-        post = str(self.post_content)
-        if con and not post.startswith('\n'):
-            post = '\n' + post
+        if con:
+            # Ensure at least one newline before post_content
+            if not con.endswith('\n'):
+                con += '\n'
+            # Do NOT strip or collapse additional newlines
+            # Also ensure post_content does NOT start with extra newlines
+            post = post.lstrip('\n')
+
         return pre + con + post
 
 
@@ -237,6 +267,7 @@ def apply_updates(text: str, blocks: list[Block]) -> str:
     cursor = 0
 
     for block in blocks:
+        print(f'FINAL BLOCK {block}')
         # unchanged text before block
         result.append(text[cursor : block.start_idx])
 

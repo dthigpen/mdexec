@@ -7,6 +7,13 @@ from .markdown import CodeBlock, Block
 import copy
 
 
+def normalize_content(block, new_content: str) -> str:
+    if '\n' in block.content or '\n' in new_content:
+        return new_content.strip('\n') + '\n'
+    else:
+        return new_content.strip('\n')
+
+
 class MdApi:
     def __init__(self, blocks: list[Block]):
         self._blocks = blocks
@@ -23,7 +30,7 @@ class MdApi:
         block = self._id_map.get(block_id)
         if not block:
             raise ValueError(f"No block with id '{block_id}'")
-        block.content = content
+        block.content = normalize_content(block, content)
 
     def find(self, predicate=None) -> list[Block]:
         results = self._blocks

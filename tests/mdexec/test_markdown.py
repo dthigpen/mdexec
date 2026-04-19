@@ -18,7 +18,7 @@ def md(text: str) -> str:
 
 def test_simple_code_block():
     text = md("""\
-``` python exec output=out-1
+``` python exec output-id=out-1
 print("hello")
 ```
 """)
@@ -36,7 +36,7 @@ print("hello")
     assert block.options['language'] == 'python'
     assert block.options['python'] is True
     assert block.options['exec'] is True
-    assert block.output_id == 'out-1'
+    assert block.get_option('output_id') == 'out-1'
 
 
 def test_code_block_no_language_only_options():
@@ -271,6 +271,10 @@ def test_round_trip_no_changes():
 ``` python
 x = 42
 ```
+              
+<!-- id:empty-html-block -->
+<!-- /id:empty-html-block -->
+
 """)
 
     blocks = parse_document(text)
