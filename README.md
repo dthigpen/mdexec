@@ -157,6 +157,14 @@ for k, v in prices.items():
 ```
 ````
 
+### Live Reload (Optional)
+
+`mdexec` is designed to be simple and composable. For auto-reloading, you can pair it with tools like `entr`:
+
+```bash
+ls notebook.md | entr mdexec notebook.md
+```
+
 ## Features
 
 * Execute Python and Bash code blocks
@@ -172,8 +180,3 @@ for k, v in prices.items():
 * Execution should be **transparent and inspectable**
 * Outputs should be **stable and version-control friendly**
 * No hidden state, no magic files
-
-## To Do
-
-- File watcher to rerun on save. E.g. `mdexec --watch *.md`.
-- More Markdown tests to ensure things like indented code blocks get handled properly.
