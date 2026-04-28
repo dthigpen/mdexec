@@ -1,17 +1,19 @@
 # `mdexec`
 
-A lightweight, zero-dependency way to turn Markdown into a **runnable notebook**.
+A lightweight, zero-dependency way to turn Markdown into a runnable notebook.
 
 Execute Python or Bash code blocks and write results **anywhere in the same file**, no hidden state, no UI, just plain text.
 
 ## Example
 
-The current time is: <!-- id:last-updated -->April 19, 2026 at 08:29 AM<!-- /id:last-updated -->
+The following timestamp auto-updates when the notebook is run.
+
+The current time is: <!-- id:last-updated -->**April 19, 2026 at 08:29 AM**<!-- /id:last-updated -->
 
 ```python exec output-id=last-updated
 from datetime import datetime
 now = datetime.now()
-print(f"{now:%B %d, %Y at %I:%M %p}")
+print(f"**{now:%B %d, %Y at %I:%M %p}**")
 ```
 
 Run:
@@ -39,7 +41,7 @@ Install directly from GitHub:
 pip install git+https://github.com/dthigpen/mdexec.git
 ```
 
-## Usage
+## Quick Start
 
 1. Create a Markdown file
 2. Add executable code blocks:
@@ -66,39 +68,155 @@ print(2 + 2)
 mdexec notebook.md
 ```
 
-## More Examples
+## Concepts
 
-For full examples, check out the source of [`example.md`](https://github.com/dthigpen/mdexec/tree/main/examples/example.md). Alternatively, see the snippets below for a quick overview.
+### Executable Code Blocks
 
-### Inline Output Anywhere
+- Markdown code blocks can be marked as executable using the `exec` attribute.
+- `exec` tells `mdexec` to run the block. Skip a code block by removing `exec` or setting it to `exec=false`.
 
 ````markdown
-The result is: <!-- id:sum -->42<!-- /id:sum -->
+```python exec
+print("Hello from Python")
+```
 
-```python exec output-id=sum
-print(40 + 2)
+```bash exec
+echo Hello from Bash
 ```
 ````
 
-### Output to Code Blocks
+### IDs: Connecting Input to Output
+
+The `id` is the glue between blocks.
+
+- A code block that gets executed (has `exec`) produces output. `stdout` can be captured and put back into the markdown document.
+- Add `output-id=other-id` to an executable code block to redirect its output somewhere else, another code block, or an html tagged region.
+- A code block is identified with the attribute `id=myid`.
+- An HTML block is identified with special tags: `< !-- id:myid -->` and `< !-- /id:myid -->`.
+- Any block that has an ID can be used as input to, or output from an executed code block.
+
+For example, this code outputs to the html tagged region below it.
 
 ````markdown
-```python exec output-id=result
-import json
-print(json.dumps({'foo': 'bar', 'hello': True}, indent=2))
+```python exec output-id=report
+print("Generated report")
 ```
 
-```json id=result
-{
-  "foo": "bar",
-  "hello": true
-}
+```html
+<!-- id:report -->
+Generated report
+<!-- /id:report -->
 ```
 ````
 
-### Input From Markdown
+- One code block maps to one output target.
+- Think of it as "write to this location".
 
-A global `md` API object is injected into Python code blocks to programmatically read/write to the Markdown document.
+### Output Targets
+
+Output from a code block can optionally be written back to the markdown file with either HTML comment blocks or code blocks.
+
+In both cases a code block must execute and produce some output. For example,
+
+````markdown
+```bash exec output-id=example
+echo Hello
+```
+````
+
+#### HTML Comment Blocks
+
+Outputting between HTML comments allows for writing arbitrary markdown content.
+
+Before execution:
+
+````markdown
+<!-- id:example -->
+<!-- /id:example -->
+````
+
+After execution:
+
+```markdown
+<!-- id:example -->
+Hello
+<!-- /id:example -->
+```
+
+- The content between the comments is replaced.
+- The `output-id` value in the source code block must match the ID in the comment.
+
+#### Output to Code Blocks
+
+Similarly, output can be written into another code block with matching IDs:
+
+Before Execution:
+
+````markdown
+```id=example
+```
+````
+
+After execution:
+
+````markdown
+```id=example
+Hello
+```
+````
+
+- For structured output like JSON, the ID should come somewhere after the language. E.g. `json id=example`.
+
+### Formatting Behavior
+
+`mdexec` tries to preserve formatting:
+- If your output has newlines, they are kept
+- If your block is multiline, output will match that style
+- No extra whitespace is added unless needed for valid Markdown
+
+This means:
+```python
+print("hello")
+print()
+print()
+```
+will produce:
+
+```
+hello
+
+
+```
+### Execution Order
+
+Blocks are executed in the order they appear in the file.
+
+- Later code blocks can depend on earlier ones (using a shared context, e.g. `ctx=something` in both code blocks)
+- Output (code and HTML) blocks can appear in any order
+- Keep this in mind when structuring notebooks
+
+
+### Shared Execution Context
+
+- By default, Python code blocks don't carry function definitions or variables to other code blocks.
+- A shared context can be declared with the attribute `ctx=some-name`.
+
+````markdown
+```python exec ctx=calc
+x = 10
+```
+
+```python exec ctx=calc
+y = x + 5
+print(y)
+```
+````
+
+### Python API
+
+- A global `md` API object is injected into Python code blocks to programmatically read and write to the Markdown document.
+- Use `md.get('some-id').content` to reference old content within Python code.
+- Use `md.set('some-id, 'new-content')` to rederence content within Python code.
 
 ````markdown
 
@@ -119,32 +237,9 @@ x = data['value'] * 456
 ```
 ````
 
-### Shared Execution Context
+Or even update cells of tables:
 
-````
-```python exec ctx=calc
-x = 10
-```
-
-```python exec ctx=calc
-y = x + 5
-print(y)
-```
-````
-
-### Bash Support
-
-````
-```bash exec
-echo "Hello from bash"
-```
-````
-
-### Dynamic Tables
-
-A global `md` API object is injected into Python code blocks to programmatically read/write to the Markdown document. This can be used to update multiple references.
-
-````
+````markdown
 | Item | Price |
 |------|-------|
 | A    | <!-- id:a -->0<!-- /id:a --> |
