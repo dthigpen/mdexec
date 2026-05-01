@@ -44,8 +44,6 @@ def run_mdexec(text: str) -> str:
     blocks = parse_document(text)
     envs = {}
     for block in blocks:
-        print(f'INITIAL BLOCK {block}')
-    for block in blocks:
         if not isinstance(block, CodeBlock):
             continue
 

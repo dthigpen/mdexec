@@ -267,7 +267,6 @@ def apply_updates(text: str, blocks: list[Block]) -> str:
     cursor = 0
 
     for block in blocks:
-        print(f'FINAL BLOCK {block}')
         # unchanged text before block
         result.append(text[cursor : block.start_idx])
 
